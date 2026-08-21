@@ -8,6 +8,10 @@ from .serializers import DocumentSerializer
 from .services import process_and_store_pdf
 import os
 from groq import Groq
+from dotenv import load_dotenv
+
+# Ye command .env file se API key nikalegi
+load_dotenv()
 
 class DocumentUploadView(APIView):
     def post(self, request, *args, **kwargs):
