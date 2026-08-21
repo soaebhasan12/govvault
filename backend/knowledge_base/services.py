@@ -1,40 +1,47 @@
-import pdfplumber
-from sentence_transformers import SentenceTransformer
+import os
+import fitz  # PyMuPDF
+import google.generativeai as genai
 from .models import Document, DocumentChunk
 
-# Ye humara local open-source AI model hai jo 384-dimension ke sticky notes (vectors) banayega
-encoder = SentenceTransformer('all-MiniLM-L6-v2')
+# 1. Gemini ko API key dekar configure karo
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
 def process_and_store_pdf(document_id):
-    # Database se document nikalo
-    doc = Document.objects.get(id=document_id)
-    pdf_path = doc.file.path
-
-    print(f"Bhai, {doc.title} ki processing shuru ho gayi hai...")
-
-    # PDFPlumber ka use karke file kholo
-    with pdfplumber.open(pdf_path) as pdf:
-        for page_num, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text()
+    try:
+        document = Document.objects.get(id=document_id)
+        file_path = document.file.path
+        
+        pdf_document = fitz.open(file_path)
+        
+        for page_num in range(len(pdf_document)):
+            page = pdf_document.load_page(page_num)
+            text_content = page.get_text("text").strip()
             
-            if text:
-                # Basic Chunking: Page ke text ko paragraphs me split kar rahe hain
-                chunks = text.split('\n\n') 
-                
-                for chunk_text in chunks:
-                    # Faltu empty spaces hatane ke liye
-                    cleaned_chunk = chunk_text.strip()
-                    if len(cleaned_chunk) > 50:  # Sirf un chunks ko lo jisme thoda meaningful data ho
-                        
-                        # AI Model se vector (sticky note) generate karwao
-                        vector = encoder.encode(cleaned_chunk).tolist()
-                        
-                        # Database me save kar do!
-                        DocumentChunk.objects.create(
-                            document=doc,
-                            page_number=page_num,
-                            text_content=cleaned_chunk,
-                            embedding=vector
-                        )
-    
-    print(f"Success! {doc.title} ke vectors database me save ho gaye.")
+            if not text_content:
+                continue
+
+            # (Optional) Agar text bohot bada hai toh usko chhote chunks (500-1000 words) me todne ka logic yahan aata hai. 
+            # Abhi prototype ke liye hum per-page ek chunk maan rahe hain.
+            
+            # 2. YAHAN CHANGE HUA HAI: SentenceTransformer ki jagah Gemini use kar rahe hain
+            # Note: Database me store karte waqt 'retrieval_document' use hota hai
+            embedding_result = genai.embed_content(
+                model="models/text-embedding-004",
+                content=text_content,
+                task_type="retrieval_document" 
+            )
+            
+            vector_embedding = embedding_result['embedding']
+
+            # 3. Database mein chunk aur vector save karo
+            DocumentChunk.objects.create(
+                document=document,
+                text_content=text_content,
+                page_number=page_num + 1,
+                embedding=vector_embedding
+            )
+            
+        print(f"Document {document.title} successfully vectorized using Gemini!")
+            
+    except Exception as e:
+        print(f"Error processing document: {e}")
