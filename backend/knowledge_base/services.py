@@ -26,7 +26,7 @@ def process_and_store_pdf(document_id):
             # 2. YAHAN CHANGE HUA HAI: SentenceTransformer ki jagah Gemini use kar rahe hain
             # Note: Database me store karte waqt 'retrieval_document' use hota hai
             embedding_result = genai.embed_content(
-                model="models/text-embedding-004",
+                model="models/embedding-001",
                 content=text_content,
                 task_type="retrieval_document" 
             )

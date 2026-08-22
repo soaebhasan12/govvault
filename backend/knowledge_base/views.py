@@ -47,27 +47,28 @@ class ChatbotView(APIView):
             return Response({"error": "Query is required"}, status=400)
 
         # 1. Use Gemini to create the vector embedding (Super lightweight!)
-        embedding_result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=user_query,
-            task_type="retrieval_query"
-        )
-        query_vector = embedding_result['embedding']
-
-        # 2. Search Database
-        similar_chunks = DocumentChunk.objects.annotate(
-            distance=CosineDistance('embedding', query_vector)
-        ).order_by('distance')[:3]
-
-        context_text = "\n\n".join([f"Page {chunk.page_number}: {chunk.text_content}" for chunk in similar_chunks])
-
-        # 3. Use Groq for generating the answer (Fast LLM)
-        groq_api_key = os.environ.get("GROQ_API_KEY") 
-        client = Groq(api_key=groq_api_key)
-
-        system_prompt = f"Answer STRICTLY based on the provided Official Context.\nContext:\n{context_text}"
-
         try:
+            # 1. Naya Stable Model Name
+            embedding_result = genai.embed_content(
+                model="models/embedding-001", # <--- YE CHANGE KIYA
+                content=user_query,
+                task_type="retrieval_query"
+            )
+            query_vector = embedding_result['embedding']
+
+            # 2. Database Search
+            similar_chunks = DocumentChunk.objects.annotate(
+                distance=CosineDistance('embedding', query_vector)
+            ).order_by('distance')[:3]
+
+            context_text = "\n\n".join([f"Page {chunk.page_number}: {chunk.text_content}" for chunk in similar_chunks])
+
+            # 3. LLM Call
+            groq_api_key = os.environ.get("GROQ_API_KEY") 
+            client = Groq(api_key=groq_api_key)
+
+            system_prompt = f"Answer STRICTLY based on the provided Official Context.\nContext:\n{context_text}"
+
             chat_completion = client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -82,16 +83,11 @@ class ChatbotView(APIView):
             if similar_chunks:
                 pdf_url = f"{request.build_absolute_uri(similar_chunks[0].document.file.url)}#page={similar_chunks[0].page_number}"
 
-            return Response({"status": "success", "answer": ai_answer, "source_pdf_url": pdf_url}, status=200)
+            return Response({"status": "success", "answer": ai_answer, "source_pdf_url": pdf_url}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            # Pura traceback print karenge aur frontend ko bhejenge
+            # Ab koi bhi crash (Gemini, Groq, ya DB) frontend ko saaf message dega
             import traceback
             error_details = traceback.format_exc()
-            print(f"CRITICAL CHAT ERROR:\n{error_details}")
-            
-            return Response({
-                "error": str(e),
-                "traceback": error_details # Yeh frontend console me dikhega
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            return Response({"error": str(e)}, status=500)
+            print(f"CRITICAL ERROR:\n{error_details}")
+            return Response({"error": str(e), "traceback": error_details}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
