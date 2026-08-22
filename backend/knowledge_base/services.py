@@ -1,9 +1,9 @@
-import os
 import fitz  # PyMuPDF
-from google import genai
+from sentence_transformers import SentenceTransformer
 from .models import Document, DocumentChunk
 
-gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# Chota aur halka model jo 512MB RAM me aaram se fit ho jaye
+embedding_model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
 
 def process_and_store_pdf(document_id):
     try:
@@ -18,14 +18,9 @@ def process_and_store_pdf(document_id):
             
             if not text_content:
                 continue
-
-            # 2. NAYA EMBEDDING SYNTAX
-            response = gemini_client.models.embed_content(
-                model="text-embedding-004",
-                contents=text_content
-            )
-            # Nayi library me data list of lists me aata hai, isliye [0] lagaya
-            vector_embedding = response.embeddings[0].values 
+                
+            # Local Embedding
+            vector_embedding = embedding_model.encode(text_content).tolist()
 
             DocumentChunk.objects.create(
                 document=document,
@@ -34,7 +29,7 @@ def process_and_store_pdf(document_id):
                 embedding=vector_embedding
             )
             
-        print(f"Document {document.title} successfully vectorized using NEW Gemini SDK!")
+        print(f"Document {document.title} successfully vectorized using Local MiniLM!")
             
     except Exception as e:
         print(f"Error processing document: {e}")

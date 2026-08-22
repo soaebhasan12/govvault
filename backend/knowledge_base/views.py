@@ -1,5 +1,5 @@
 import os
-from google import genai
+from sentence_transformers import SentenceTransformer
 from pgvector.django import CosineDistance
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -34,7 +34,7 @@ class DocumentUploadView(APIView):
       
       
       
-gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+embedding_model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
 
 class ChatbotView(APIView):
     def post(self, request, *args, **kwargs):
@@ -43,14 +43,9 @@ class ChatbotView(APIView):
             return Response({"error": "Query is required"}, status=400)
 
         try:
-            # 2. NAYA EMBEDDING SYNTAX FOR QUERY
-            response = gemini_client.models.embed_content(
-                model="text-embedding-004",
-                contents=user_query
-            )
-            query_vector = response.embeddings[0].values
+            # Local Embedding for Question
+            query_vector = embedding_model.encode(user_query).tolist()
 
-            # ... niche ka pura RAG aur Groq wala code ekdum SAME rahega ...
             similar_chunks = DocumentChunk.objects.annotate(
                 distance=CosineDistance('embedding', query_vector)
             ).order_by('distance')[:3]
