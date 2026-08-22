@@ -1,5 +1,5 @@
 import os
-import google.generativeai as genai
+from google import genai
 from pgvector.django import CosineDistance
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -34,11 +34,7 @@ class DocumentUploadView(APIView):
       
       
       
-# Ye humara AI encoder hai jo user ke text ka vector banayega
-# encoder = SentenceTransformer('all-MiniLM-L6-v2')
-
-# Gemini API setup for embeddings
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 class ChatbotView(APIView):
     def post(self, request, *args, **kwargs):
@@ -46,24 +42,21 @@ class ChatbotView(APIView):
         if not user_query:
             return Response({"error": "Query is required"}, status=400)
 
-        # 1. Use Gemini to create the vector embedding (Super lightweight!)
         try:
-            # 1. Naya Stable Model Name
-            embedding_result = genai.embed_content(
-                model="models/embedding-001", # <--- YE CHANGE KIYA
-                content=user_query,
-                task_type="retrieval_query"
+            # 2. NAYA EMBEDDING SYNTAX FOR QUERY
+            response = gemini_client.models.embed_content(
+                model="text-embedding-004",
+                contents=user_query
             )
-            query_vector = embedding_result['embedding']
+            query_vector = response.embeddings[0].values
 
-            # 2. Database Search
+            # ... niche ka pura RAG aur Groq wala code ekdum SAME rahega ...
             similar_chunks = DocumentChunk.objects.annotate(
                 distance=CosineDistance('embedding', query_vector)
             ).order_by('distance')[:3]
 
             context_text = "\n\n".join([f"Page {chunk.page_number}: {chunk.text_content}" for chunk in similar_chunks])
 
-            # 3. LLM Call
             groq_api_key = os.environ.get("GROQ_API_KEY") 
             client = Groq(api_key=groq_api_key)
 
@@ -86,7 +79,6 @@ class ChatbotView(APIView):
             return Response({"status": "success", "answer": ai_answer, "source_pdf_url": pdf_url}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            # Ab koi bhi crash (Gemini, Groq, ya DB) frontend ko saaf message dega
             import traceback
             error_details = traceback.format_exc()
             print(f"CRITICAL ERROR:\n{error_details}")

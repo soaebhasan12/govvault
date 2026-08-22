@@ -1,10 +1,9 @@
 import os
 import fitz  # PyMuPDF
-import google.generativeai as genai
+from google import genai
 from .models import Document, DocumentChunk
 
-# 1. Gemini ko API key dekar configure karo
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 def process_and_store_pdf(document_id):
     try:
@@ -20,20 +19,14 @@ def process_and_store_pdf(document_id):
             if not text_content:
                 continue
 
-            # (Optional) Agar text bohot bada hai toh usko chhote chunks (500-1000 words) me todne ka logic yahan aata hai. 
-            # Abhi prototype ke liye hum per-page ek chunk maan rahe hain.
-            
-            # 2. YAHAN CHANGE HUA HAI: SentenceTransformer ki jagah Gemini use kar rahe hain
-            # Note: Database me store karte waqt 'retrieval_document' use hota hai
-            embedding_result = genai.embed_content(
-                model="models/embedding-001",
-                content=text_content,
-                task_type="retrieval_document" 
+            # 2. NAYA EMBEDDING SYNTAX
+            response = gemini_client.models.embed_content(
+                model="text-embedding-004",
+                contents=text_content
             )
-            
-            vector_embedding = embedding_result['embedding']
+            # Nayi library me data list of lists me aata hai, isliye [0] lagaya
+            vector_embedding = response.embeddings[0].values 
 
-            # 3. Database mein chunk aur vector save karo
             DocumentChunk.objects.create(
                 document=document,
                 text_content=text_content,
@@ -41,7 +34,7 @@ def process_and_store_pdf(document_id):
                 embedding=vector_embedding
             )
             
-        print(f"Document {document.title} successfully vectorized using Gemini!")
+        print(f"Document {document.title} successfully vectorized using NEW Gemini SDK!")
             
     except Exception as e:
         print(f"Error processing document: {e}")
