@@ -42,6 +42,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'cloudinary_storage',
+    'cloudinary',
+    'knowledge_base',
     'rest_framework',
     'knowledge_base',
     'corsheaders',
@@ -138,3 +141,15 @@ MAILERS = {
 
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+import os
+
+# Cloudinary Configuration
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_URL', '').split('@')[-1] if os.environ.get('CLOUDINARY_URL') else '',
+    'API_KEY': os.environ.get('CLOUDINARY_URL', '').split('://')[1].split(':')[0] if os.environ.get('CLOUDINARY_URL') else '',
+    'API_SECRET': os.environ.get('CLOUDINARY_URL', '').split(':')[2].split('@')[0] if os.environ.get('CLOUDINARY_URL') else '',
+}
+
+# Django ko bataya ki files Cloudinary par save karni hain
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.RawMediaCloudinaryStorage'
