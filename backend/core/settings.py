@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     'cloudinary',
     'knowledge_base',
     'rest_framework',
-    'knowledge_base',
     'corsheaders',
 ]
 
