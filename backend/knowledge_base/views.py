@@ -1,5 +1,5 @@
 import os
-from sentence_transformers import SentenceTransformer
+import requests
 from pgvector.django import CosineDistance
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -34,7 +34,18 @@ class DocumentUploadView(APIView):
       
       
       
-embedding_model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
+def get_gemini_embedding(text):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
+    payload = {
+        "model": "models/text-embedding-004",
+        "content": {"parts": [{"text": text}]}
+    }
+    response = requests.post(url, json=payload, headers={'Content-Type': 'application/json'})
+    if response.status_code == 200:
+        return response.json()['embedding']['values']
+    else:
+        raise Exception(f"API Error: {response.text}")
 
 class ChatbotView(APIView):
     def post(self, request, *args, **kwargs):
@@ -43,8 +54,8 @@ class ChatbotView(APIView):
             return Response({"error": "Query is required"}, status=400)
 
         try:
-            # Local Embedding for Question
-            query_vector = embedding_model.encode(user_query).tolist()
+            # Question ko vector mein badlo directly API se
+            query_vector = get_gemini_embedding(user_query)
 
             similar_chunks = DocumentChunk.objects.annotate(
                 distance=CosineDistance('embedding', query_vector)
