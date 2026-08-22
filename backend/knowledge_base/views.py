@@ -85,4 +85,13 @@ class ChatbotView(APIView):
             return Response({"status": "success", "answer": ai_answer, "source_pdf_url": pdf_url}, status=200)
 
         except Exception as e:
+            # Pura traceback print karenge aur frontend ko bhejenge
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"CRITICAL CHAT ERROR:\n{error_details}")
+            
+            return Response({
+                "error": str(e),
+                "traceback": error_details # Yeh frontend console me dikhega
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response({"error": str(e)}, status=500)
