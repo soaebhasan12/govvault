@@ -5,8 +5,23 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from .models import DocumentChunk
+from .serializers import DocumentSerializer
+from .services import process_and_store_pdf
 from groq import Groq
 
+# 1. UPLOAD VIEW (Jo miss ho gaya tha)
+class DocumentUploadView(APIView):
+    def post(self, request, *args, **kwargs):
+        serializer = DocumentSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            document = serializer.save()
+            process_and_store_pdf(document.id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_request)
+
+# 2. RAW REST API FOR GEMINI
 def get_gemini_embedding(text):
     api_key = os.environ.get("GEMINI_API_KEY")
     url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
@@ -20,6 +35,7 @@ def get_gemini_embedding(text):
     else:
         raise Exception(f"API Error: {response.text}")
 
+# 3. CHAT VIEW
 class ChatbotView(APIView):
     def post(self, request, *args, **kwargs):
         user_query = request.data.get('query', '')
