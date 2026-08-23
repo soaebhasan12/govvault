@@ -1,23 +1,9 @@
-import os
 import fitz
-import requests
+from sentence_transformers import SentenceTransformer
 from .models import Document, DocumentChunk
 
-def get_gemini_embedding(text):
-    api_key = os.environ.get("GEMINI_API_KEY")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={api_key}"
-    
-    payload = {
-        "model": "models/text-embedding-004",
-        "content": {"parts": [{"text": text}]}
-    }
-    
-    response = requests.post(url, json=payload, headers={'Content-Type': 'application/json'})
-    
-    if response.status_code == 200:
-        return response.json()['embedding']['values']
-    else:
-        raise Exception(f"API Error: {response.text}")
+# Chhota model load karo jo RAM crash na kare
+embedding_model = SentenceTransformer('paraphrase-MiniLM-L3-v2')
 
 def process_and_store_pdf(document_id):
     try:
@@ -31,8 +17,8 @@ def process_and_store_pdf(document_id):
             if not text_content:
                 continue
                 
-            # REST API se Vector mangwao
-            vector_embedding = get_gemini_embedding(text_content)
+            # Local model se vector generate karo
+            vector_embedding = embedding_model.encode(text_content).tolist()
 
             DocumentChunk.objects.create(
                 document=document,
@@ -41,7 +27,7 @@ def process_and_store_pdf(document_id):
                 embedding=vector_embedding
             )
             
-        print(f"Document {document.title} vectorized using Raw REST API!")
+        print(f"Document {document.title} vectorized using Local SentenceTransformers!")
             
     except Exception as e:
-        print(f"Error processing document: {e}")
+        print(f"CRITICAL ERROR in process_and_store_pdf: {e}")
