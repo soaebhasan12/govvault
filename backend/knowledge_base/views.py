@@ -24,6 +24,7 @@ class DocumentUploadView(APIView):
 class ChatbotView(APIView):
     def post(self, request, *args, **kwargs):
         user_query = request.data.get('query', '')
+        document_ids = request.data.get('document_ids', [])
         if not user_query:
             return Response({"error": "Query is required"}, status=400)
 
@@ -31,11 +32,25 @@ class ChatbotView(APIView):
             # Query ko locally vectorize karo
             query_vector = embedding_model.encode(user_query).tolist()
 
-            similar_chunks = DocumentChunk.objects.annotate(
-                distance=CosineDistance('embedding', query_vector)
-            ).order_by('distance')[:3]
+            chunks_qs = DocumentChunk.objects.all()
+            if document_ids:
+                chunks_qs = chunks_qs.filter(document_id__in=document_ids)
 
-            context_text = "\n\n".join([f"Page {chunk.page_number}: {chunk.text_content}" for chunk in similar_chunks])
+            similar_chunks = chunks_qs.annotate(
+                distance=CosineDistance('embedding', query_vector)
+            ).order_by('distance')[:5]
+
+            RELEVANCE_THRESHOLD = 0.8
+            relevant_chunks = [c for c in similar_chunks if c.distance < RELEVANCE_THRESHOLD]
+
+            if not relevant_chunks:
+                return Response({
+                    "status": "success",
+                    "answer": "I couldn't find relevant information in the uploaded document(s) to answer that. Try rephrasing, or upload a document that covers this topic.",
+                    "source_pdf_url": None
+                }, status=status.HTTP_200_OK)
+
+            context_text = "\n\n".join([f"Page {chunk.page_number}: {chunk.text_content}" for chunk in relevant_chunks])
 
             groq_api_key = os.environ.get("GROQ_API_KEY") 
             client = Groq(api_key=groq_api_key)
@@ -47,14 +62,14 @@ class ChatbotView(APIView):
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_query}
                 ],
-                model="llama3-8b-8192", 
+                model="openai/gpt-oss-20b", 
                 temperature=0.2
             )
             ai_answer = chat_completion.choices[0].message.content
             
             pdf_url = None
-            if similar_chunks:
-                pdf_url = f"{request.build_absolute_uri(similar_chunks[0].document.file.url)}#page={similar_chunks[0].page_number}"
+            if relevant_chunks:
+                pdf_url = f"{request.build_absolute_uri(relevant_chunks[0].document.file.url)}#page={relevant_chunks[0].page_number}"
 
             return Response({"status": "success", "answer": ai_answer, "source_pdf_url": pdf_url}, status=status.HTTP_200_OK)
 
