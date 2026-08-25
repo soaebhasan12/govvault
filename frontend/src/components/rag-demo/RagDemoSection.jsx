@@ -56,7 +56,7 @@ export default function RagDemoSection() {
     if (!selectedFile) return setUploadMessage('Please select a PDF!');
 
     setIsUploading(true);
-    setUploadMessage('');
+    setUploadMessage('Uploading...');
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('title', selectedFile.name);
@@ -65,17 +65,31 @@ export default function RagDemoSection() {
       const res = await axios.post(`${import.meta.env.VITE_API_URL}/documents/upload/`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      updateActiveSession({
-        docIds: [...active.docIds, res.data.id],
-        docs: [...active.docs, { id: res.data.id, title: res.data.title }],
-        title: active.title === 'New Chat' ? selectedFile.name.replace('.pdf', '') : active.title,
-      });
-      setUploadMessage('Vectorized successfully!');
-      setSelectedFile(null);
+      const docId = res.data.id;
+      setUploadMessage('Processing document...');
+
+      // Poll every 1.5s until backend finishes vectorizing
+      const poll = setInterval(async () => {
+        const statusRes = await axios.get(`${import.meta.env.VITE_API_URL}/documents/${docId}/status/`);
+        if (statusRes.data.status === 'completed') {
+          clearInterval(poll);
+          updateActiveSession({
+            docIds: [...active.docIds, docId],
+            docs: [...active.docs, { id: docId, title: res.data.title }],
+            title: active.title === 'New Chat' ? selectedFile.name.replace('.pdf', '') : active.title,
+          });
+          setUploadMessage('Vectorized successfully!');
+          setSelectedFile(null);
+          setIsUploading(false);
+        } else if (statusRes.data.status === 'failed') {
+          clearInterval(poll);
+          setUploadMessage('Processing failed. Try another file.');
+          setIsUploading(false);
+        }
+      }, 1500);
     } catch (error) {
       console.error('Upload Error:', error);
       setUploadMessage('Error uploading document.');
-    } finally {
       setIsUploading(false);
     }
   };

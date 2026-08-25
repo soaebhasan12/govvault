@@ -16,6 +16,8 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
           <Link to="/chat" className="hover:text-white transition-colors">Live Demo</Link>
           <a href="#video" className="hover:text-white transition-colors">Video Walkthrough</a>
+          <a href="#features" className="hover:text-white transition-colors">Features</a>
+          <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
           <a href="#stack" className="hover:text-white transition-colors">Tech Stack</a>
         </div>
 
