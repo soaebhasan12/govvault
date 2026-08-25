@@ -4,9 +4,9 @@ from pgvector.django import CosineDistance
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .models import DocumentChunk
+from .models import DocumentChunk, Document
 from .serializers import DocumentSerializer
-from .services import process_and_store_pdf
+from .tasks import process_document_task
 from groq import Groq
 
 # Wahi chhota model yahan load karo
@@ -17,7 +17,7 @@ class DocumentUploadView(APIView):
         serializer = DocumentSerializer(data=request.data)
         if serializer.is_valid():
             document = serializer.save()
-            process_and_store_pdf(document.id)
+            process_document_task.delay(document.id)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -78,3 +78,12 @@ class ChatbotView(APIView):
             error_details = traceback.format_exc()
             print(f"CRITICAL ERROR in ChatbotView:\n{error_details}")
             return Response({"error": str(e), "traceback": error_details}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        
+class DocumentStatusView(APIView):
+    def get(self, request, pk, *args, **kwargs):
+        try:
+            doc = Document.objects.get(id=pk)
+            return Response({"id": doc.id, "status": doc.status})
+        except Document.DoesNotExist:
+            return Response({"error": "Not found"}, status=404)
