@@ -20,7 +20,7 @@ export default function VideoShowcase() {
           <div className="aspect-video bg-slate-900">
             <iframe
               className="w-full h-full"
-              src="https://www.youtube.com/embed/YOUR_VIDEO_ID"
+              src="https://www.youtube.com/embed/5wsTy9qECdw"
               title="GovVault Demo"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
