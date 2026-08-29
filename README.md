@@ -1,3 +1,5 @@
+![GovVault Banner](./frontend/src/assets/banner.jpeg)
+
 # 🏛️ GovVault
 
 **A local-first RAG (Retrieval-Augmented Generation) assistant for government documents.**
