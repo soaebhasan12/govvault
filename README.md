@@ -1,4 +1,6 @@
-![GovVault Banner](./frontend/src/assets/banner.jpeg)
+<p align="center">
+  <img src="./frontend/src/assets/banner_gemini.png" alt="GovVault Banner" width="100%">
+</p>
 
 # 🏛️ GovVault
 
